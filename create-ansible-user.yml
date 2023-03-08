@@ -1,0 +1,76 @@
+---
+- hosts: all
+  remote_user: root
+  vars:
+    ## override anything here with a survey in AAP
+    ## example #1: auto generate sshkeys and store in the playbook directory
+    ## and the path to store the keys and who will own it
+    ## automation user name
+    newusername: ansiblesvc
+    ## group membership for privileged actions
+    newgroups: "wheel,root"
+    ## name of the ssh key
+    newsshkeyname: "{{ newusername }}-20230307.key"
+    sshkeypath: "{{ playbook_dir }}/keys"
+    keystore_autogenerate: yes
+    keystore_host: localhost
+    keystore_user: "{{ ansible_user }}"
+    ## or the actual user who will use the keys should be the owner
+    #keystore_user: "syspimp"
+    #
+    ## example #2: keypairs already exists and you want to copy the pub over
+    ## ssh pub key exists on filesystem on control node and you want to copy it to target
+    ## provide the path
+    #public_key: "{{ lookup('file', '{{ playbook_dir }}/{{ newsshkeyname }}.pub') }}"
+    ## or use an url to fetch a pub ssh key
+    ##public_key: "{{ lookup('url', 'https://satellite-server.your.org:9090/ssh/pubkey') }}"
+    ## or paste it in directly
+    ##public_key: "ssh-rsa AAAAB3Nz ...blah... 03Ug30uAv8= you@there.com"
+    #
+    ## example #3: auto-generate keypairs on the satellite server
+    ## or have it auto generate a new key pair each time and save somewhere
+    #keystore_autogenerate: yes
+    #newsshkeyname: "foreman-proxy-{{ ansible_date_time.date }}-{{ ansible_date_time.time }}"
+    #sshkeypath: "/usr/share/foreman-proxy/.ssh/{{ newsshkeyname }}"
+    ## keystore_host is the satellite server
+    #keystore_host: management.tfound.org
+    #keystore_user: "foreman-proxy"
+  tasks:
+  - name: "Generate the automation ssh keypairs"
+    community.crypto.openssh_keypair:
+      path: "{{ sshkeypath }}/{{ newsshkeyname }}"
+      owner: "{{ keystore_user }}"
+    register: sshkeys
+    when:
+      - keystore_autogenerate is defined
+      - keystore_autogenerate | bool
+    delegate_to: "{{ keystore_host }}"
+
+  - name: "Set the public key varible"
+    set_fact:
+      public_key: "{{ sshkeys.public_key }}"
+    when:
+      - keystore_autogenerate is defined
+      - keystore_autogenerate | bool
+
+  - name: "Add the automation user '{{ newusername }}'"
+    user:
+      name: "{{ newusername }}"
+      comment: "Built By Ansible Automation"
+      groups: "{{ newgroups }}"
+      append: yes
+
+  - name: Set authorized key
+    ansible.posix.authorized_key:
+      user: "{{ newusername }}"
+      state: present
+      key: "{{ public_key }}"
+
+  - name: Add the Sudo rules for the new automation user
+    template:
+      src: "automation-sudo-rules.j2"
+      dest: "/etc/sudoers.d/{{ newusername }}"
+      owner: root
+      group: root
+      mode: '0440'
+

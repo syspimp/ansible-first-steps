@@ -1,0 +1,27 @@
+---
+- name: Update remote execution ssh keypairs in Satellite
+  hosts: satellite-server
+  vars:
+    newsshkeypath: /usr/share/foreman/.ssh/
+    newsshkeyname: ansiblesvc.key
+  tasks:
+  - name: "Sanity check for importing new ssh keys"
+    stat:
+      path: "{{ newsshkeypath }}/{{ newsshkeyname }}"
+    register: sanitycheck
+    become: yes
+
+  - name: "Fail when new ssh key not found"
+    ansible.builtin.fail:
+      msg: "The ssh key pairs do not exist at {{ newsshkeypath }}/{{ newsshkeyname }}"
+    when: sanitycheck.stat.exists == false
+
+  - name: "Add new ssh keypairs to Satellite"
+    shell: |
+      satellite-installer \
+      --foreman-proxy-plugin-remote-execution-ssh-ssh-identity-dir {{ newsshkeypath }}  \
+      --foreman-proxy-plugin-remote-execution-ssh-ssh-identity-file {{ newsshkeyname }}
+    become: yes
+
+
+ blah blah blah update tower

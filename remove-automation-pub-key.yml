@@ -1,0 +1,27 @@
+---
+# This should be run from the host where the ssh pub key lives, aka keystore_host
+- name: Remove ssh pub key from target
+  hosts: all
+  vars:
+    ## override anything here with a survey in AAP
+    # the user we want to manage. we will keep this. we use this info to connect
+    newusername: ansiblesvc
+    newsshkeyname: ansiblesvc-20230307.key
+    sshkeypath: "{{ playbook_dir }}/keys"
+    ansible_ssh_private_key_file: "{{ sshkeypath }}/{{ newsshkeyname }}"
+    ## provide the path to public key we want to remove
+    oldsshkeyname: "ansiblesvc.key"
+    oldsshkey: "{{ lookup('file', '{{ sshkeypath }}/{{ oldsshkeyname }}.pub') }}"
+    ## or use an url to fetch a pub ssh key
+    ##oldsshkey: "{{ lookup('url', 'https://satellite-server.your.org:9090/ssh/pubkey') }}"
+    ## or paste it in directly
+    ##oldsshkey: "ssh-rsa AAAAB3Nz ...blah... 03Ug30uAv8= you@there.com"
+  remote_user: "{{ newusername }}"
+  tasks:
+  - name: Remove the old authorized key
+    ansible.posix.authorized_key:
+      user: "{{ newusername }}"
+      state: absent
+      key: "{{ oldsshkey }}"
+    delegate_to: "{{ inventory_hostname }}"
+

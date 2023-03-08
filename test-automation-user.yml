@@ -1,0 +1,27 @@
+---
+- hosts: all
+  vars:
+    newusername: ansiblesvc
+    sshkeyname: ansiblesvc-20230307.key
+    sshkeypath: "{{ playbook_dir }}/keys"
+    ansible_ssh_private_key_file: "{{ sshkeypath }}/{{ sshkeyname }}"
+  remote_user: "{{ newusername }}"
+  tasks:
+  - name: "Test output from shell"
+    shell: "echo $(uname -a); who am i"
+    register: shelloutput
+
+  - name: "Shell output"
+    debug:
+      var: shelloutput
+        
+  - name: "Test privileged output from shell"
+    shell: "ls -l /root"
+    become: yes
+    register: shelloutput
+
+  - name: "Privileged shell output"
+    debug:
+      var: shelloutput
+        
+
